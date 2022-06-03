@@ -1,0 +1,99 @@
+import torch
+import os
+import torch.nn as nn
+from torch.utils.data import Dataset, DataLoader
+import torch.optim as optim
+from torchvision.datasets import ImageFolder
+from torchvision import transforms
+from PIL import Image
+
+
+class MyDataset(Dataset):
+    def __init__(self, root_dir, label_dir):  # 去读数据路径
+        self.root_dir=root_dir
+        self.label_dir=label_dir
+        self.path=os.path.join(self.root_dir,self.label_dir)
+        self.img_list=os.listdir(self.path)
+
+    def __len__(self):  # 返回数据长度
+        return len(self.img_list)
+
+    def __getitem__(self, idx):  # 返回当前位置的数据和标签
+        img_name = self.img_list[idx]
+        img_item_path = os.path.join(self.root_dir,self.label_dir,img_name)
+        img = Image.open(img_item_path)
+        label = self.label_dir
+        return img, label
+
+
+
+
+transform=transforms.Compose([transforms.ToTensor()])
+train_data=ImageFolder(r'../4_png/Train/',transform=transform)
+trainloader=torch.utils.data.DataLoader(train_data,batch_size=4, shuffle=True)
+
+test_data=ImageFolder(r'../4_png/Test/',transform=transform)
+testloader=torch.utils.data.DataLoader(test_data,batch_size=4, shuffle=True)
+
+
+class Net(nn.Module):
+    def __init__(self):
+        super(Net, self).__init__()
+        self.conv=nn.Sequential(
+            nn.Conv2d(3,6,3),
+            nn.Sigmoid(),
+            nn.AdaptiveMaxPool2d(28,28),
+            nn.Conv2d(6,16,3),
+            nn.Sigmoid(),
+            nn.AdaptiveMaxPool2d(28,28)
+        )
+
+        self.fc=nn.Sequential(
+            nn.Linear(16*28*28,120),
+            nn.Sigmoid(),
+            nn.Linear(120,84),
+            nn.Sigmoid(),
+            nn.Linear(84,13)
+        )
+
+
+    def forward(self, x):
+        features=self.conv(x)
+        outputs=self.fc(features.view(x.shape[0],-1))
+        return outputs
+
+net = Net()
+print(net)
+
+criterion = nn.CrossEntropyLoss()
+optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
+
+
+# for epoch in range(3):  # loop over the dataset multiple times
+#     running_loss = 0.0
+#     for i, data in enumerate(trainloader, 0):
+#         # get the inputs; data is a list of [inputs, labels]
+#         inputs, labels = data
+#         print(inputs.shape)
+#         # zero the parameter gradients
+#         optimizer.zero_grad()
+#
+#         # forward + backward + optimize
+#         outputs = net(inputs)
+#         loss = criterion(outputs, labels)
+#         loss.backward()
+#         optimizer.step()
+#
+#         # print statistics
+#         running_loss += loss.item()
+#         if i % 2000 == 1999:    # print every 2000 mini-batches
+#             print('[%d, %5d] loss: %.3f' %
+#                   (epoch + 1, i + 1, running_loss / 2000))
+#             running_loss = 0.0
+
+for i, data in enumerate(trainloader, 0):
+    # get the inputs; data is a list of [inputs, labels]
+    inputs, labels = data
+    print(inputs.shape)
+
+print('Finished Training')
