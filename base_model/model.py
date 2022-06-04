@@ -10,7 +10,6 @@
 import torch
 import torch.nn as nn
 
-from torchvision.models.resnet import resnet18
 from typing import Type, Any, Callable, Union, List, Optional
 from torchvision.models.resnet import ResNet, BasicBlock, Bottleneck
 # from utils import read_split_data, one_hot
@@ -31,6 +30,7 @@ class MyResnet(ResNet):
         norm_layer: Optional[Callable[..., nn.Module]] = None
     ) -> None:
         super(MyResnet, self).__init__(block, layers, num_classes, zero_init_residual, groups, width_per_group, replace_stride_with_dilation, norm_layer)
+        self.classNum = num_classes
         self.conv1 = nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(1, 1), padding=3, bias=False)
         self.maxpool = nn.Identity()
         self.inplanes = 64
@@ -68,6 +68,7 @@ class MyResnet(ResNet):
         x = torch.flatten(x, 1)
         feature = x
         x = self.fc(x)
+        x = self.classificator(x)
         return feature, x
 
 
