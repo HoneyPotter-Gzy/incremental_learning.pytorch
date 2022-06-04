@@ -9,13 +9,13 @@
 
 
 import torch
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import DataLoader
 import pickle
 # from datasets import read_split_data, MyDataset
-from dataset_new import MyDataset
-from utils import one_hot, save_model, save_plots
+from dataset_process.dataset_new import MyDataset
+from utils.utils import save_model, save_plots
 # from model import MyModel
-from model import MyResnet, get_MyResnet
+from base_model.model import get_MyResnet
 
 # from utils import read_split_data, one_hot
 

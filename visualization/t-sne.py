@@ -11,10 +11,10 @@ import numpy as np
 import pickle
 import torch
 import matplotlib.pyplot as plt
-from sklearn import manifold, datasets
-from dataset_new import MyDataset
-from torch.utils.data import Dataset, DataLoader
-from model import get_MyResnet
+from sklearn import manifold
+from dataset_process.dataset_new import MyDataset
+from torch.utils.data import DataLoader
+from base_model.model import get_MyResnet
 import torch.nn as nn
 from collections import OrderedDict
 
