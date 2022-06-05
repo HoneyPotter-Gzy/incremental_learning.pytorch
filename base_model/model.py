@@ -12,70 +12,75 @@ import torch.nn as nn
 
 from typing import Type, Any, Callable, Union, List, Optional
 from torchvision.models.resnet import ResNet, BasicBlock, Bottleneck
+
 # from utils import read_split_data, one_hot
 
-classNum=12
-device=torch.device("cuda")
+classNum = 12
+device = torch.device("cuda")
 
 class MyResnet(ResNet):
-    def __init__(
-        self,
-        block: Type[Union[BasicBlock, Bottleneck]],
-        layers: List[int],
-        num_classes: int = 1000,
-        zero_init_residual: bool = False,
-        groups: int = 1,
-        width_per_group: int = 64,
-        replace_stride_with_dilation: Optional[List[bool]] = None,
-        norm_layer: Optional[Callable[..., nn.Module]] = None
+    def __init__ (
+            self,
+            block: Type[Union[BasicBlock, Bottleneck]],
+            layers: List[int],
+            num_classes: int = 1000,
+            zero_init_residual: bool = False,
+            groups: int = 1,
+            width_per_group: int = 64,
+            replace_stride_with_dilation: Optional[List[bool]] = None,
+            norm_layer: Optional[Callable[..., nn.Module]] = None
     ) -> None:
-        super(MyResnet, self).__init__(block, layers, num_classes, zero_init_residual, groups, width_per_group, replace_stride_with_dilation, norm_layer)
+        super(MyResnet, self).__init__(block, layers, num_classes,
+                                       zero_init_residual, groups,
+                                       width_per_group,
+                                       replace_stride_with_dilation,
+                                       norm_layer)
         self.classNum = num_classes
-        self.conv1 = nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(1, 1), padding=3, bias=False)
+        self.conv1 = nn.Conv2d(1, 64, kernel_size = (7, 7), stride = (1, 1),
+                               padding = 3, bias = False)
         self.maxpool = nn.Identity()
         self.inplanes = 64
         self.layer1 = self._make_layer(block, 64, layers[0])
-        self.layer2 = self._make_layer(block, 128, layers[1], stride=1,
-                                       dilate=False)
-        self.layer3 = self._make_layer(block, 256, layers[2], stride=1,
-                                       dilate=False)
-        self.layer4 = self._make_layer(block, 512, layers[3], stride=1,
-                                       dilate=False)
+        self.layer2 = self._make_layer(block, 128, layers[1], stride = 1,
+                                       dilate = False)
+        self.layer3 = self._make_layer(block, 256, layers[2], stride = 1,
+                                       dilate = False)
+        self.layer4 = self._make_layer(block, 512, layers[3], stride = 1,
+                                       dilate = False)
         self.fc = nn.Linear(512, classNum)
         self.classificator = nn.Softmax(-1)
 
-    def forward(self, x):
-        # x=self.conv1(x)
-        # x=self.maxpool(x)
-        # x=self.layer1(x)
-        # x=self.layer2(x)
-        # x=self.layer3(x)
-        # x=self.layer4(x)
-        # feature = x
-        # x=self.fc(x)
+    # def forward (self, x):
+    #     # x=self.conv1(x)
+    #     # x=self.maxpool(x)
+    #     # x=self.layer1(x)
+    #     # x=self.layer2(x)
+    #     # x=self.layer3(x)
+    #     # x=self.layer4(x)
+    #     # feature = x
+    #     # x=self.fc(x)
+    #
+    #     x = self.conv1(x)
+    #     x = self.bn1(x)
+    #     x = self.relu(x)
+    #     x = self.maxpool(x)
+    #
+    #     x = self.layer1(x)
+    #     x = self.layer2(x)
+    #     x = self.layer3(x)
+    #     x = self.layer4(x)
+    #
+    #     x = self.avgpool(x)
+    #     x = torch.flatten(x, 1)
+    #     # feature = x
+    #     x = self.fc(x)
+    #     # x = self.classificator(x)
+    #     # return feature, x
+    #     return x
 
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.relu(x)
-        x = self.maxpool(x)
-
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-        x = self.layer4(x)
-
-        x = self.avgpool(x)
-        x = torch.flatten(x, 1)
-        feature = x
-        x = self.fc(x)
-        x = self.classificator(x)
-        return feature, x
-
-
-def get_MyResnet() -> ResNet:
+def get_MyResnet () -> ResNet:
     model = MyResnet(BasicBlock, [2, 2, 2, 2])
     return model
-
 
 # class MyModel(nn.Module):
 #     def __init__(self, classnum=12, dim=28 * 28):
@@ -133,18 +138,18 @@ def get_MyResnet() -> ResNet:
 #     print(model)
 #     return model
 
-    # if fine_tune:
-    #     print('[INFO]: Fine-tuning all layers...')
-    #     for params in model.parameters():
-    #         params.requires_grad=True
-    #
-    # else:
-    #     print('[INFO]: Freezing hidden layers...')
-    #     for params in model.parameters():
-    #         params.requires_grad=False
+# if fine_tune:
+#     print('[INFO]: Fine-tuning all layers...')
+#     for params in model.parameters():
+#         params.requires_grad=True
+#
+# else:
+#     print('[INFO]: Freezing hidden layers...')
+#     for params in model.parameters():
+#         params.requires_grad=False
 
-    # in_channel = model.fc.in_features
-    # model.fc = torch.nn.Linear(in_channel, classNum)
-    # return model.to(device)
+# in_channel = model.fc.in_features
+# model.fc = torch.nn.Linear(in_channel, classNum)
+# return model.to(device)
 # model=MyModel()
 # print(model)

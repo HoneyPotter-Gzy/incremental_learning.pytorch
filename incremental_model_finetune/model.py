@@ -14,6 +14,7 @@ from base_model.model import MyResnet, get_MyResnet
 from typing import Type, Any, Callable, Union, List, Optional
 from torchvision.models.resnet import ResNet, BasicBlock, Bottleneck
 
+classNum = 8
 
 class IncrementalResnet(MyResnet):
     def __init__(self,
@@ -26,7 +27,8 @@ class IncrementalResnet(MyResnet):
         replace_stride_with_dilation: Optional[List[bool]] = None,
         norm_layer: Optional[Callable[..., nn.Module]] = None
     ):
-        ResNet.__init__(self, block, layers, num_classes, zero_init_residual, groups, width_per_group, replace_stride_with_dilation, norm_layer)
+        MyResnet.__init__(self, block, layers, num_classes, zero_init_residual, groups, width_per_group, replace_stride_with_dilation, norm_layer)
+        self.fc = nn.Linear(512, classNum)
 
     def increment_classes(self, n):
         '''

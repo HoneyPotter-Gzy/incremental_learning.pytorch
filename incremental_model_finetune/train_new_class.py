@@ -1,14 +1,12 @@
 #!/usr/bin/env python
 # -*- encoding: utf-8 -*-
 '''
-@Time: 2022/6/4 18:51  
+@Time: 2022/6/5 12:43  
 @Author: Zheyuan Gu
-@File: train.py.py   
-@Description: None
+@File: train_new_class.py   
+@Description: 加载八类的模型，使用新四类的去微调
 '''
-# model_path=r'E:\gzy\preprocess1\outputs\models_resnet_modified\model_147e.pth'
-# state = torch.load(model_path)
-# model.load_state_dict(state['model_state_dict'])
+
 import torch
 from torch.utils.data import DataLoader
 import pickle
@@ -17,7 +15,7 @@ from utils.utils import save_model, save_plots
 # from base_model.model import get_MyResnet
 from incremental_model_finetune.model import get_MyIncrementalResnet
 
-model_name = 'incremental_resnet_modified'
+model_name = 'incremental_newclasses_resnet_modified'
 # source_data = r'dataset/12class-train-traffic-data.pkl'
 old_data = r'D:\毕设\preprocess\code_new\dataset\first_class_[0, 1, 2, 3, 4, 5, 6, 7].pkl'
 new_data = r'D:\毕设\preprocess\code_new\dataset\second_class_[8, 9, 10, 11].pkl'
@@ -38,7 +36,7 @@ def train (device = torch.device("cuda"), multi_gpu = False,
 
     print('[INFO]: Computation device: {}'.format(device))
 
-    with open(new_data, 'rb') as f:
+    with open(new_data, 'rb') as f:  # 记载
         train_img_path = pickle.load(f)
         train_img_label = pickle.load(f)
         test_img_path = pickle.load(f)
@@ -56,6 +54,22 @@ def train (device = torch.device("cuda"), multi_gpu = False,
 
     model = get_MyIncrementalResnet()
     model.to(device = device)
+    # 加载历史模型参数
+    model_path=r'D:\毕设\preprocess\code_new\outputs\models_incremental_old_resnet_modified\model_61e.pth'
+    if device == torch.device("cuda"):
+        model = torch.nn.DataParallel(model)
+
+    state = torch.load(model_path)
+    model.load_state_dict(state['model_state_dict'])
+
+    # 看看参数
+    # print(model.module)
+    # print(model.module.fc.weight.data)
+    # 更改fc层输出并将输出维度改为总类别数（8+4）
+    model.module.increment_classes(4)
+    # print("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&")
+    # print(model.module)
+    # print(model.module.fc.weight.data)
 
     if load_ckpt:
         model.load_state_dict(torch.load(load_ckpt))
@@ -67,6 +81,7 @@ def train (device = torch.device("cuda"), multi_gpu = False,
                                 weight_decay = weight_decay)
     # lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer,
     #                                                     [epoch * 0.5])
+    lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor = 0.1, verbose = True)
 
     best_pfm = 0.0
 
@@ -103,6 +118,7 @@ def train (device = torch.device("cuda"), multi_gpu = False,
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
+            # lr_scheduler.step()
 
         epoch_train_loss = train_loss / train_cnt
         epoch_train_acc = 100. * (train_correct_num) / len(
@@ -158,6 +174,8 @@ def train (device = torch.device("cuda"), multi_gpu = False,
         if epoch_test_acc > best_pfm:
             best_pfm = epoch_test_acc
             save_model(e, model, optimizer, lossfunc, model_name = model_name)
+
+        lr_scheduler.step()
 
     save_plots(train_acc_list, test_acc_list, train_loss_list, test_loss_list,
                name = model_name)
