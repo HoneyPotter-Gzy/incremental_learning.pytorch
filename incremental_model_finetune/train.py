@@ -11,25 +11,26 @@ import torch
 from torch.utils.data import DataLoader
 import pickle
 from dataset_process.dataset_new import MyDataset
-from utils.utils import save_model, save_plots
+from myUtils.utils import save_model, save_plots
+
 # from base_model.model import get_MyResnet
 from incremental_model_finetune.model import get_MyIncrementalResnet
 
-model_name = 'incremental_resnet_modified'
+model_name = 'incremental_old_resnet_modified'
 # source_data = r'dataset/12class-train-traffic-data.pkl'
-old_data = r'D:\毕设\preprocess\code_new\dataset\first_class_[0, 1, 2, 3, 4, 5, 6, 7].pkl'
-new_data = r'D:\毕设\preprocess\code_new\dataset\second_class_[8, 9, 10, 11].pkl'
-classNum = 12
-batch_size = 16
-epoch = 200
-lr = 1e-2
+old_data = r'E:\gzy\preprocess1\dataset\first_class_[0, 1, 2, 3, 4, 5, 6, 7].pkl'
+new_data = r'E:\gzy\preprocess1\dataset\second_class_[8, 9, 10, 11].pkl'
+# classNum = 12
+batch_size = 512
+epoch = 150
+lr = 1e-3
 weight_decay = 1e-5
 # lbs = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
 old_classes = [0, 1, 2, 3, 4, 5, 6, 7]
 new_classes = [8, 9, 10, 11]
 
 
-def train (device = torch.device("cuda"), multi_gpu = False,
+def train (device = torch.device("cuda"), multi_gpu = True,
            batch_size = batch_size,
            epoch = epoch, lr = lr, weight_decay = weight_decay,
            load_ckpt = None):

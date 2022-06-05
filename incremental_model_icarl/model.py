@@ -226,7 +226,7 @@
 #         # Form combined training set
 #         self.combine_dataset_with_exemplars(dataset)
 #
-#         loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size,
+#         loader = torch.myUtils.data.DataLoader(dataset, batch_size=batch_size,
 #                                                shuffle=True, num_workers=2)
 #
 #         # Store network outputs with pre-update parameters

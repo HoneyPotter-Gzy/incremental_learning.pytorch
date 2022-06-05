@@ -62,7 +62,7 @@
 #                          classes=range(s,s+num_classes),
 #                          download=True,
 #                          transform=transform_test)
-#     train_loader = torch.utils.data.DataLoader(train_set, batch_size=100,
+#     train_loader = torch.myUtils.data.DataLoader(train_set, batch_size=100,
 #                                                shuffle=True, num_workers=2)
 #
 #     # 加载测试集
@@ -71,7 +71,7 @@
 #                          classes=range(num_classes),
 #                          download=True,
 #                          transform=transform_test)
-#     test_loader = torch.utils.data.DataLoader(test_set, batch_size=100,
+#     test_loader = torch.myUtils.data.DataLoader(test_set, batch_size=100,
 #                                                shuffle=True, num_workers=2)
 #
 #

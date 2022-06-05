@@ -12,7 +12,7 @@ import torch.nn as nn
 
 from typing import Type, Any, Callable, Union, List, Optional
 from torchvision.models.resnet import ResNet, BasicBlock, Bottleneck
-# from utils import read_split_data, one_hot
+# from myUtils import read_split_data, one_hot
 
 classNum=12
 device=torch.device("cuda")
@@ -30,7 +30,7 @@ class MyResnet(ResNet):
         norm_layer: Optional[Callable[..., nn.Module]] = None
     ) -> None:
         super(MyResnet, self).__init__(block, layers, num_classes, zero_init_residual, groups, width_per_group, replace_stride_with_dilation, norm_layer)
-        self.classNum = num_classes
+        # self.classNum = num_classes
         self.conv1 = nn.Conv2d(1, 64, kernel_size=(7, 7), stride=(1, 1), padding=3, bias=False)
         self.maxpool = nn.Identity()
         self.inplanes = 64
@@ -44,32 +44,33 @@ class MyResnet(ResNet):
         self.fc = nn.Linear(512, classNum)
         self.classificator = nn.Softmax(-1)
 
-    def forward(self, x):
-        # x=self.conv1(x)
-        # x=self.maxpool(x)
-        # x=self.layer1(x)
-        # x=self.layer2(x)
-        # x=self.layer3(x)
-        # x=self.layer4(x)
-        # feature = x
-        # x=self.fc(x)
-
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.relu(x)
-        x = self.maxpool(x)
-
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-        x = self.layer4(x)
-
-        x = self.avgpool(x)
-        x = torch.flatten(x, 1)
-        feature = x
-        x = self.fc(x)
-        x = self.classificator(x)
-        return feature, x
+    # def forward(self, x):
+    #     # x=self.conv1(x)
+    #     # x=self.maxpool(x)
+    #     # x=self.layer1(x)
+    #     # x=self.layer2(x)
+    #     # x=self.layer3(x)
+    #     # x=self.layer4(x)
+    #     # feature = x
+    #     # x=self.fc(x)
+    #
+    #     x = self.conv1(x)
+    #     x = self.bn1(x)
+    #     x = self.relu(x)
+    #     x = self.maxpool(x)
+    #
+    #     x = self.layer1(x)
+    #     x = self.layer2(x)
+    #     x = self.layer3(x)
+    #     x = self.layer4(x)
+    #
+    #     x = self.avgpool(x)
+    #     x = torch.flatten(x, 1)
+    #     feature = x
+    #     x = self.fc(x)
+    #     x = self.classificator(x)
+    #     # return feature, x
+    #     return x
 
 
 def get_MyResnet() -> ResNet:

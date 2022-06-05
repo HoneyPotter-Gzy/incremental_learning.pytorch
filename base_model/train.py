@@ -13,11 +13,12 @@ from torch.utils.data import DataLoader
 import pickle
 # from datasets import read_split_data, MyDataset
 from dataset_process.dataset_new import MyDataset
-from utils.utils import save_model, save_plots
+# rom utils.utils import save_model, save_plots
+from myUtils.utils import save_model, save_plots
 # from model import MyModel
 from base_model.model import get_MyResnet
 
-# from utils import read_split_data, one_hot
+# from myUtils import read_split_data, one_hot
 
 # trainpath = r'../4_Png/Train'
 # testpath = r'../4_Png/Test'

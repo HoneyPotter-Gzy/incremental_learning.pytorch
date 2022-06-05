@@ -5,7 +5,7 @@ from torch.utils.data import Dataset
 from torchvision.transforms.transforms import Compose, ToTensor
 import random
 import json
-# from utils import read_split_data, one_hot
+# from myUtils import read_split_data, one_hot
 
 classNum=14
 
