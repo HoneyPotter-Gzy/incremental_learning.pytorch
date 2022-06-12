@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 def train(args):
     logger_lib.set_logging_level(args["logging"])
-
+    # TODO: 这个autolabel是干啥的？
     autolabel = _set_up_options(args)
     if args["autolabel"]:
         args["label"] = autolabel
@@ -44,6 +44,7 @@ def train(args):
     start_date = utils.get_date()
 
     orders = copy.deepcopy(args["order"])
+    # 删除args中的order，为啥要删除？
     del args["order"]
     if orders is not None:
         assert isinstance(orders, list) and len(orders)
@@ -59,7 +60,7 @@ def train(args):
         args["device"] = device
 
         start_time = time.time()
-
+        # 进入实际的train()函数
         for avg_inc_acc, last_acc, forgetting in _train(args, start_date, orders[i], i):
             yield avg_inc_acc, last_acc, forgetting, False
 
@@ -89,6 +90,7 @@ def train(args):
 
 def _train(args, start_date, class_order, run_id):
     _set_global_parameters(args)
+    # 按照传递的参数，设置数据集和模型对象
     inc_dataset, model = _set_data_model(args, class_order)
     results, results_folder = _set_results(args, start_date)
 
@@ -101,9 +103,9 @@ def _train(args, start_date, class_order, run_id):
         task_info, train_loader, val_loader, test_loader = inc_dataset.new_task(memory, memory_val)
         if task_info["task"] == args["max_task"]:
             break
-
+        # 这里的before task之类的只是写一个函数，具体的执行调用函数写在模型类的内部
         model.set_task_info(task_info)
-
+        #
         # ---------------
         # 1. Prepare Task
         # ---------------
@@ -247,6 +249,7 @@ def _after_task(config, model, inc_dataset, run_id, task_id, results_folder):
 
 
 def _set_results(config, start_date):
+    # 获取保存路径
     if config["label"]:
         results_folder = results_utils.get_save_folder(config["model"], start_date, config["label"])
     else:
@@ -261,9 +264,11 @@ def _set_results(config, start_date):
 
 
 def _set_data_model(config, class_order):
+    # 获取数据，get_data部分是针对不同数据集做不同的处理，比如怎么读取，有多少类别，类别在所有任务中的出现顺序
     inc_dataset = factory.get_data(config, class_order)
+    # 在所有任务中 各个类别出现的顺序
     config["classes_order"] = inc_dataset.class_order
-
+    # 按照需求获取模型，实例化一个指定的模型对象，该对象封装了模型的结构、方法和训练过程
     model = factory.get_model(config)
     model.inc_dataset = inc_dataset
 
@@ -301,7 +306,7 @@ def _set_up_options(args):
             raise IOError("Not found options file {}.".format(option_path))
 
         args.update(_parse_options(option_path))
-
+        # autolabel存的是模型+组合数据集的名字：icarl_cifar100, cifar100_3orders
         autolabel.append(os.path.splitext(os.path.basename(option_path))[0])
 
     return "_".join(autolabel)

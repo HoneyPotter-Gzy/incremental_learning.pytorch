@@ -550,3 +550,7 @@ class LAD(DataHandler):
         print(f"{len(self.data)} images for {len(self.label_to_id)} classes.")
 
         return self
+
+class ISCXVPN(DataHandler):
+    # TODO: 定义如何处理ISCXVPN
+    pass

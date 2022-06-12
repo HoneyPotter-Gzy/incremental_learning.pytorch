@@ -9,7 +9,7 @@ from torchvision import transforms
 
 from .datasets import (
     APY, CUB200, LAD, AwA2, ImageNet100, ImageNet100UCIR, ImageNet1000, TinyImageNet200, iCIFAR10,
-    iCIFAR100
+    iCIFAR100, ISCXVPN
 )
 
 logger = logging.getLogger(__name__)
@@ -43,8 +43,8 @@ class IncrementalDataset:
         workers=10,
         batch_size=128,
         seed=1,
-        increment=10,
-        validation_split=0.,
+        increment=10,  # 每个任务多10个类
+        validation_split=0.,  # 不设测试集
         onehot=False,
         initial_increment=None,
         sampler=None,
@@ -55,6 +55,7 @@ class IncrementalDataset:
         all_test_classes=False,
         metadata_path=None
     ):
+        # 读取数据集
         datasets = _get_datasets(dataset_name)
         if metadata_path:
             print("Adding metadata path {}".format(metadata_path))
@@ -301,7 +302,7 @@ class IncrementalDataset:
                 x_train, y_train, validation_split
             )
             x_test, y_test = test_dataset.data, np.array(test_dataset.targets)
-
+            # class_order是在所有任务中类别出现的顺序
             order = list(range(len(np.unique(y_train))))
             if random_order:
                 random.seed(seed)  # Ensure that following order is determined by seed:
@@ -317,14 +318,15 @@ class IncrementalDataset:
 
             self.class_order.append(order)
 
+            # 按照前面生成的order的顺序，生成新的训练label（从1开始
             y_train = self._map_new_class_index(y_train, order)
             y_val = self._map_new_class_index(y_val, order)
             y_test = self._map_new_class_index(y_test, order)
-
+            # 加上目前的class_idx，就是实际的新的训练label
             y_train += current_class_idx
             y_val += current_class_idx
             y_test += current_class_idx
-
+            # 更新current_class_idx
             current_class_idx += len(order)
             if len(datasets) > 1:
                 self.increments.append(len(order))
@@ -434,6 +436,9 @@ def _get_datasets(dataset_names):
 
 
 def _get_dataset(dataset_name):
+    '''
+    获取数据集
+    '''
     dataset_name = dataset_name.lower().strip()
 
     if dataset_name == "cifar10":
@@ -456,5 +461,7 @@ def _get_dataset(dataset_name):
         return APY
     elif dataset_name == "lad":
         return LAD
+    elif dataset_name == "ISCXVPN":
+        return ISCXVPN
     else:
         raise NotImplementedError("Unknown dataset {}.".format(dataset_name))
