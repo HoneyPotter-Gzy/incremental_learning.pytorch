@@ -4,6 +4,7 @@ import logging
 import math
 import os
 import warnings
+import pickle
 
 import numpy as np
 from torchvision import datasets, transforms
@@ -43,6 +44,7 @@ class iCIFAR10(DataHandler):
 
 
 class iCIFAR100(iCIFAR10):
+    # torchvision自带数据集，可以不写加载方式，其他数据集的base_dataset都是函数
     base_dataset = datasets.cifar.CIFAR100
     common_transforms = [
         transforms.ToTensor(),
@@ -102,6 +104,7 @@ class ImageNet100(DataHandler):
             self.train_transforms.pop(-1)
 
     def base_dataset(self, data_path, train=True, download=False):
+        # 基数据集的准备，包括数据集下载、拆分
         if download:
             warnings.warn(
                 "ImageNet incremental dataset cannot download itself,"
@@ -551,6 +554,26 @@ class LAD(DataHandler):
 
         return self
 
+
 class ISCXVPN(DataHandler):
-    # TODO: 定义如何处理ISCXVPN
-    pass
+    # 定义如何处理ISCXVPN, 原始数据的onehotlabel要转化成单数字标签label
+    def base_dataset(self, data_path, train=True, download=False):
+        if train:
+            self._train_dataset(data_path)
+        else:
+            self._val_dataset(data_path)
+
+        return self
+
+    def _train_dataset(self, data_path):
+        with open(data_path, 'rb') as f:
+            self.data = pickle.load(f)
+            self.targets = np.argmax(pickle.load(f), axis = 1)
+
+
+    def _val_dataset(self, data_path):
+        with open(data_path, 'rb') as f:
+            train_data = pickle.load(f)
+            train_label = pickle.load(f)
+            self.data = pickle.load(f)
+            self.targets = np.argmax(pickle.load(f), axis = 1)

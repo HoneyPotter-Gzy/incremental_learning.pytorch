@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class BasicNet(nn.Module):
-
+    # BasicNet初始化部分，
     def __init__(
         self,
         convnet_type,
@@ -46,7 +46,7 @@ class BasicNet(nn.Module):
                 "Unknown postprocessor {}.".format(postprocessor_kwargs["type"])
             )
         logger.info("Post processor is: {}".format(self.post_processor))
-
+        # 在这里初始化基本的模型结构
         self.convnet = factory.get_convnet(convnet_type, **convnet_kwargs)
 
         if "type" not in classifier_kwargs:

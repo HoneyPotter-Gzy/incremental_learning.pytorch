@@ -6,6 +6,7 @@ import torch
 from PIL import Image
 from torch.utils.data import DataLoader
 from torchvision import transforms
+from torchvision.transforms.transforms import Compose, ToTensor
 
 from .datasets import (
     APY, CUB200, LAD, AwA2, ImageNet100, ImageNet100UCIR, ImageNet1000, TinyImageNet200, iCIFAR10,
@@ -55,7 +56,7 @@ class IncrementalDataset:
         all_test_classes=False,
         metadata_path=None
     ):
-        # 读取数据集
+        # 读取数据集，返回这个数据集对应的类
         datasets = _get_datasets(dataset_name)
         if metadata_path:
             print("Adding metadata path {}".format(metadata_path))
@@ -145,11 +146,13 @@ class IncrementalDataset:
             x_val, y_val, val_memory_flags = self._add_memory(x_val, y_val, *memory_val)
         else:
             val_memory_flags = np.zeros((x_val.shape[0],))
-
-        train_loader = self._get_loader(x_train, y_train, train_memory_flags, mode="train")
+        # TODO: 补充iscxvpn这部分的Dataset类
+        train_loader = self._get_loader(x_train, y_train, train_memory_flags, mode="train", dataset = "iscxvpn")
+        # train_loader = self._get_loader(x_train, y_train, train_memory_flags, mode="train")
         val_loader = self._get_loader(x_val, y_val, val_memory_flags,
-                                      mode="train") if len(x_val) > 0 else None
-        test_loader = self._get_loader(x_test, y_test, np.zeros((x_test.shape[0],)), mode="test")
+                                      mode="train", dataset = "iscxvpb") if len(x_val) > 0 else None
+        test_loader = self._get_loader(x_test, y_test, np.zeros((x_test.shape[0],)), mode="test", dataset = "iscxvpn")
+        # test_loader = self._get_loader(x_test, y_test, np.zeros((x_test.shape[0],)), mode="test")
 
         task_info = {
             "min_class": min_class,
@@ -242,7 +245,7 @@ class IncrementalDataset:
         idxes = np.where(np.logical_and(y >= low_range, y < high_range))[0]
         return x[idxes], y[idxes]
 
-    def _get_loader(self, x, y, memory_flags, shuffle=True, mode="train", sampler=None):
+    def _get_loader(self, x, y, memory_flags, shuffle=True, mode="train", sampler=None, dataset = "normal"):
         if mode == "train":
             trsf = transforms.Compose([*self.train_transforms, *self.common_transforms])
         elif mode == "test":
@@ -265,14 +268,20 @@ class IncrementalDataset:
         else:
             sampler = None
             batch_size = self._batch_size
-
-        return DataLoader(
-            DummyDataset(x, y, memory_flags, trsf, open_image=self.open_image),
-            batch_size=batch_size,
-            shuffle=shuffle if sampler is None else False,
-            num_workers=self._workers,
-            batch_sampler=sampler
-        )
+        # TODO: 因为iscxvpn的格式和图片不一样，所以要区分一下用什么DataLoader
+        if dataset == "normal":
+            return DataLoader(
+                DummyDataset(x, y, memory_flags, trsf, open_image=self.open_image),
+                batch_size=batch_size,
+                shuffle=shuffle if sampler is None else False,
+                num_workers=self._workers,
+                batch_sampler=sampler
+            )
+        elif dataset == "iscxvpn":
+            # TODO: 定义MyDataLoader和MyDataset
+            return DataLoader(
+                MyDataset(x, y, memory_flags)
+            )
 
     def _setup_data(
         self,
@@ -431,6 +440,32 @@ class DummyDataset(torch.utils.data.Dataset):
         return {"inputs": img, "targets": y, "memory_flags": memory_flag}
 
 
+class MyDataset(torch.utils.data.Dataset):
+    def __init__ (self, imgs, labels, memory_flags):
+        self.imgs = imgs  # N*784维的图片
+        # _, self.labels = torch.max(labels, 1) # N*12维的one-hot向量转为N个单标签
+        self.labels = labels
+        self.memory_flags = memory_flags
+        self.transforms = Compose([
+            ToTensor()
+        ])
+
+        self.dataAug = None
+
+        assert self.imgs.shape[0] == self.labels.shape[0] == self.memory_flags.shape[0]
+
+    def __len__ (self):
+        return self.imgs.shape[0]
+
+    def __getitem__ (self, item):
+        # img=torch.tensor(self.imgs[item]).reshape(len(self.imgs), 28, 28)
+        img = torch.tensor(self.imgs[item]).reshape(1, 28, 28)
+        label = torch.tensor(self.labels[item])
+        memory_flag = self.memory_flags[item]
+        # torch.max(label.data, 1)
+        # return img, label  # img是N*1*28*28的灰度图，label是单数字
+        return { "inputs": img, "targets": label, "memory_flags": memory_flag }
+
 def _get_datasets(dataset_names):
     return [_get_dataset(dataset_name) for dataset_name in dataset_names.split("-")]
 
@@ -461,7 +496,7 @@ def _get_dataset(dataset_name):
         return APY
     elif dataset_name == "lad":
         return LAD
-    elif dataset_name == "ISCXVPN":
+    elif dataset_name == "iscxvpn":
         return ISCXVPN
     else:
         raise NotImplementedError("Unknown dataset {}.".format(dataset_name))

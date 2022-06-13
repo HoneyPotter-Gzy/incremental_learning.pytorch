@@ -56,7 +56,7 @@ class ResNetBasicblock(nn.Module):
 
         return F.relu(residual + basicblock, inplace=True)
 
-
+# CifarResNet定义基本的网络结构
 class CifarResNet(nn.Module):
     """
     ResNet optimized for the Cifar Dataset, as specified in
@@ -128,7 +128,7 @@ class CifarResNet(nn.Module):
     def forwardFeature(self, x):
         pass
 
-
+# 以下的resnet20、resnet10mnist都是用来具体地实例化不同的CifarResNet对象的，基模型都是CifarResNet
 def resnet20(num_classes=10):
     """Constructs a ResNet-20 model for CIFAR-10 (by default)
     Args:

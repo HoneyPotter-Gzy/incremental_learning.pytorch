@@ -19,7 +19,7 @@ EPSILON = 1e-8
 
 logger = logging.getLogger(__name__)
 
-
+# 每个方法是一个类，这个类继承IncrementalLearner
 class ICarl(IncrementalLearner):
     """Implementation of iCarl.
 
@@ -63,7 +63,7 @@ class ICarl(IncrementalLearner):
 
         self._rotations_config = args.get("rotations_config", {})
         self._random_noise_config = args.get("random_noise_config", {})
-
+        # 网络基本结构的定义由convnet决定，通过BasicNet来初始化
         self._network = network.BasicNet(
             args["convnet"],
             convnet_kwargs=args.get("convnet_config", {}),

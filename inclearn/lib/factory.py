@@ -6,7 +6,7 @@ from torch import optim
 from inclearn import models
 from inclearn.convnet import (
     densenet, my_resnet, my_resnet2, my_resnet_brn, my_resnet_mcbn, my_resnet_mtl, resnet,
-    resnet_mtl, ucir_resnet, vgg
+    resnet_mtl, ucir_resnet, vgg, myresnet_gzy
 )
 from inclearn.lib import data, schedulers
 
@@ -53,6 +53,9 @@ def get_convnet(convnet_type, **kwargs):
         return my_resnet_mtl.resnet_rebuffi(**kwargs)
     elif convnet_type == "vgg19":
         return vgg.vgg19_bn(**kwargs)
+    # TODO: 完善基模型
+    elif convnet_type == "myresnet_gzy":
+        return myresnet_gzy.myresnet_gzy(**kwargs)
 
     raise NotImplementedError("Unknwon convnet type {}.".format(convnet_type))
 
