@@ -1,0 +1,187 @@
+#!/usr/bin/env python
+# -*- encoding: utf-8 -*-
+'''
+@Time: 2022/6/13 0:05  
+@Author: Zheyuan Gu
+@File: myresnet_gzy.py.bak
+@Description: None
+'''
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from typing import Type, Any, Callable, Union, List, Optional
+from torchvision.models.resnet import ResNet, BasicBlock, Bottleneck
+
+class ResidualBlock(nn.Module):
+    expansion = 1
+    # TODO: increase_dim到底是什么……（我猜是是否要升维
+    def __init__(self, inplanes, increase_dim=False, last_relu=False, downsampling="stride"):
+        super(ResidualBlock, self).__init__()
+
+        self.increase_dim = increase_dim
+        # 如果要增加维度，那么步长设置为2，输出通道数是原来的2倍
+        if increase_dim:
+            first_stride = 2
+            planes = inplanes * 2
+        # 如果不增加维度，那么步长设置为1，输出通道数和原来一样
+        else:
+            first_stride = 1
+            planes = inplanes
+
+        self.conv_a = nn.Conv2d(
+            inplanes, planes, kernel_size=3, stride=first_stride, padding=1, bias=False
+        )
+        self.bn_a = nn.BatchNorm2d(planes)
+
+        self.conv_b = nn.Conv2d(planes, planes, kernel_size=3, stride=1, padding=1, bias=False)
+        self.bn_b = nn.BatchNorm2d(planes)
+
+        if increase_dim:
+            if downsampling == "stride":
+                self.downsampler = DownsampleStride()
+                self._need_pad = True
+            else:
+                self.downsampler = DownsampleConv(inplanes, planes)
+                self._need_pad = False
+
+        self.last_relu = last_relu
+
+    @staticmethod
+    def pad(x):
+        return torch.cat((x, x.mul(0)), 1)
+
+    def forward(self, x):
+        y = self.conv_a(x)
+        y = self.bn_a(y)
+        y = F.relu(y, inplace=True)
+
+        y = self.conv_b(y)
+        y = self.bn_b(y)
+
+        if self.increase_dim:
+            x = self.downsampler(x)
+            if self._need_pad:
+                x = self.pad(x)
+
+        y = x + y
+
+        if self.last_relu:
+            y = F.relu(y, inplace=True)
+
+        return y
+
+# Stage又是干嘛的……
+class Stage(nn.Module):
+
+    def __init__ (self, blocks, block_relu = False):
+        super().__init__()
+        # 一个残差块
+        self.blocks = nn.ModuleList(blocks)
+        self.block_relu = block_relu
+
+    def forward (self, x):
+        intermediary_features = []
+
+        for b in self.blocks:
+            x = b(x)
+            # 记录中间层特征
+            intermediary_features.append(x)
+
+            if self.block_relu:
+                x = F.relu(x)
+        # 返回中间层特征和最终的输出
+        return intermediary_features, x
+
+class MyResnetGZY(ResNet):
+    # TODO: 6.13起来写这部分的网络结构和方法，争取上午成功跑起来icarl！下午研究自己的方法
+    # TODO: 6.13进度，output["features"] 没有feature字段，看看别人的模型
+    def __init__ (
+            self,
+            block: Type[Union[BasicBlock, Bottleneck]],
+            layers: List[int],
+            num_classes: int,
+            zero_init_residual: bool = False,
+            groups: int = 1,
+            width_per_group: int = 64,
+            replace_stride_with_dilation: Optional[List[bool]] = None,
+            norm_layer: Optional[Callable[..., nn.Module]] = None
+    ) -> None:
+        super(MyResnetGZY, self).__init__(block, layers, num_classes,
+                                       zero_init_residual, groups,
+                                       width_per_group,
+                                       replace_stride_with_dilation,
+                                       norm_layer)
+        # 以下是基本的网络结构
+        self.classNum = num_classes
+        self.conv1 = nn.Conv2d(1, 64, kernel_size = (7, 7), stride = (1, 1),
+                               padding = 3, bias = False)
+        self.maxpool = nn.Identity()
+        self.inplanes = 64
+        self.layer1 = self._make_layer(block, 64, layers[0])
+        self.layer2 = self._make_layer(block, 128, layers[1], stride = 1,
+                                       dilate = False)
+        self.layer3 = self._make_layer(block, 256, layers[2], stride = 1,
+                                       dilate = False)
+        self.layer4 = self._make_layer(block, 512, layers[3], stride = 1,
+                                       dilate = False)
+        self.fc = nn.Linear(512, self.classNum)
+        self.out_dim = 512
+
+    # def _make_layer (self, block: Type[Union[BasicBlock, Bottleneck]],
+    #                  planes: int, blocks: int,
+    #                  stride: int = 1, dilate: bool = False):
+    #     layers = []
+
+
+    # def _make_layer(self, Block, planes, increase_dim=False, n=None):
+    #     layers = []
+    #
+    #     if increase_dim:
+    #         layers.append(
+    #             Block(
+    #                 planes,
+    #                 increase_dim=True,
+    #                 last_relu=False,
+    #                 downsampling=self._downsampling_type
+    #             )
+    #         )
+    #         planes = 2 * planes
+    #
+    #     for i in range(n):
+    #         layers.append(Block(planes, last_relu=False, downsampling=self._downsampling_type))
+    #
+    #     return Stage(layers, block_relu=self.last_relu)
+
+    # forward应当返回：return {"raw_features": raw_features, "features": features, "attention": attentions}
+    def forward(self, x):
+        x=self.conv1(x)  # 过第一个卷积层
+        x=self.bn1(x)
+        x=self.relu(x)
+        x=self.maxpool(x)
+
+        feats_s1, x=self.layer1(x)
+        feats_s2, x=self.layer2(x)
+        feats_s3, x=self.layer3(x)
+        x=self.layer4(x)
+
+        raw_features = self.end_features(x)
+        features = self.end_features(F.relu(x, inplace = False))
+        # 这里x要不要过平均池化、展平和fc呢
+        x=self.avgpool(x)
+        x=torch.flatten(x, 1)
+        x=self.fc(x)
+
+        return x
+
+    def end_features(self, x):
+        x = self.pool(x)
+        x = x.view(x.size(0), -1)
+
+        if self.final_layer is not None:
+            x = self.final_layer(x)
+
+        return x
+
+
+def myresnet_gzy(num_classes = 12):
+    return MyResnetGZY(BasicBlock, [2, 2, 2, 2], num_classes)

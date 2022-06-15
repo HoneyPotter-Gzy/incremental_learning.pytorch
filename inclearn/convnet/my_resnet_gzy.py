@@ -1,3 +1,12 @@
+#!/usr/bin/env python
+# -*- encoding: utf-8 -*-
+'''
+@Time: 2022/6/14 23:58  
+@Author: Zheyuan Gu
+@File: my_resnet_gzy.py
+@Description: None
+'''
+
 """Pytorch port of the resnet used for CIFAR100 by iCaRL.
 
 https://github.com/srebuffi/iCaRL/blob/master/iCaRL-TheanoLasagne/utils_cifar100.py
@@ -8,6 +17,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn import init
+from typing import Type, Any, Callable, Union, List, Optional
 
 from inclearn.lib import pooling
 
@@ -96,56 +106,7 @@ class ResidualBlock(nn.Module):
 
         return y
 
-
-class PreActResidualBlock(nn.Module):
-    expansion = 1
-
-    def __init__(self, inplanes, increase_dim=False, last_relu=False):
-        super().__init__()
-
-        self.increase_dim = increase_dim
-
-        if increase_dim:
-            first_stride = 2
-            planes = inplanes * 2
-        else:
-            first_stride = 1
-            planes = inplanes
-
-        self.bn_a = nn.BatchNorm2d(inplanes)
-        self.conv_a = nn.Conv2d(
-            inplanes, planes, kernel_size=3, stride=first_stride, padding=1, bias=False
-        )
-
-        self.bn_b = nn.BatchNorm2d(planes)
-        self.conv_b = nn.Conv2d(planes, planes, kernel_size=3, stride=1, padding=1, bias=False)
-
-        if increase_dim:
-            self.downsample = DownsampleStride()
-            self.pad = lambda x: torch.cat((x, x.mul(0)), 1)
-        self.last_relu = last_relu
-
-    def forward(self, x):
-        y = self.bn_a(x)
-        y = F.relu(y, inplace=True)
-        y = self.conv_a(x)
-
-        y = self.bn_b(y)
-        y = F.relu(y, inplace=True)
-        y = self.conv_b(y)
-
-        if self.increase_dim:
-            x = self.downsample(x)
-            x = self.pad(x)
-
-        y = x + y
-
-        if self.last_relu:
-            y = F.relu(y, inplace=True)
-
-        return y
-
-# Stage又是干嘛的……
+# make_layer的返回值：Stage(layers, block_relu = self.last_relu)
 class Stage(nn.Module):
 
     def __init__(self, blocks, block_relu=False):
@@ -168,7 +129,8 @@ class Stage(nn.Module):
         return intermediary_features, x
 
 
-class CifarResNet(nn.Module):
+# class CifarResNet(nn.Module):
+class MyResNetGZY(nn.Module):
     """
     ResNet optimized for the Cifar Dataset, as specified in
     https://arxiv.org/abs/1512.03385.pdf
@@ -176,9 +138,9 @@ class CifarResNet(nn.Module):
 
     def __init__(
         self,
-        n=5,  #
-        nf=16,  # num_features
-        channels=3,  # 通道数
+        layers: List[int],
+        nf=64,  # num_features
+        channels=1,  # 通道数
         preact=False,
         zero_residual=True,
         pooling_config={"type": "avg"},  # 默认平均池化
@@ -202,18 +164,28 @@ class CifarResNet(nn.Module):
         self._downsampling_type = downsampling
         self.last_relu = last_relu
 
-        Block = ResidualBlock if not preact else PreActResidualBlock
+        # Block = ResidualBlock if not preact else PreActResidualBlock
+        Block = ResidualBlock
 
-        super(CifarResNet, self).__init__()
+        # super(CifarResNet, self).__init__()
+        super(MyResNetGZY, self).__init__()
 
-        self.conv_1_3x3 = nn.Conv2d(channels, nf, kernel_size=3, stride=1, padding=1, bias=False)
-        # nf: num_features, 特征个数，函数默认参数是16
+        # self.conv_1_3x3 = nn.Conv2d(channels, nf, kernel_size=3, stride=1, padding=1, bias=False)
+        self.conv1 = nn.Conv2d(channels, nf, kernel_size = (7, 7), stride = (1, 1), padding = 3, bias = False)
+        # nf: num_features, 特征个数，函数默认参数是64
+        # TODO: 这里要过BN吗
         self.bn_1 = nn.BatchNorm2d(nf)
         # 四个layer，以下的block都是残差块
         # increase_dim是指，n是指Block的个数
-        self.stage_1 = self._make_layer(Block, nf, increase_dim=False, n=n)
-        self.stage_2 = self._make_layer(Block, nf, increase_dim=True, n=n - 1)
-        self.stage_3 = self._make_layer(Block, 2 * nf, increase_dim=True, n=n - 2)
+        # TODO: 明天起来改写_make_layer
+        # 接口make_layer要返回stage类型
+        # self.stage_1 = self._make_layer(Block, nf, increase_dim=False, n=n)
+        # self.stage_2 = self._make_layer(Block, nf, increase_dim=True, n=n - 1)
+        # self.stage_3 = self._make_layer(Block, 2 * nf, increase_dim=True, n=n - 2)
+        # 和原模型的区别在于：第二层nf不翻倍，最后一层只用一个Block
+        self.stage_1 = self._make_layer(Block, nf, increase_dim = False, n = layers[0])
+        self.stage_2 = self._make_layer(Block, nf, increase_dim = True, n = layers[1])
+        self.stage_3 = self._make_layer(Block, 2*nf, increase_dim = True, n = layers[2])
         self.stage_4 = Block(
             4 * nf, increase_dim=False, last_relu=False, downsampling=self._downsampling_type
         )
@@ -268,7 +240,7 @@ class CifarResNet(nn.Module):
     # ResidualBlock()的构造函数：def __init__(self, inplanes, increase_dim=False, last_relu=False, downsampling="stride"):
     def _make_layer(self, Block, planes, increase_dim=False, n=None):
         layers = []
-        # 如果要增加维度的话，就构造一个增加维度的ResidualBlock
+        # 如果要增加维度的话，就构造一个增加维度的ResidualBlock，每构造一层，planes都翻一倍
         if increase_dim:
             layers.append(
                 Block(
@@ -290,13 +262,14 @@ class CifarResNet(nn.Module):
         return self.stage_4.conv_b
 
     def forward(self, x):
-        x = self.conv_1_3x3(x)
+        # x = self.conv_1_3x3(x)
+        x = self.conv1(x)
         x = F.relu(self.bn_1(x), inplace=True)
         # stage_1返回的是Stage，make_layer里面的操作是n个Block
         feats_s1, x = self.stage_1(x)
         feats_s2, x = self.stage_2(x)
         feats_s3, x = self.stage_3(x)
-        # stage_4是Residual Block
+        # stage_4是一个单独的Residual Block
         x = self.stage_4(x)
         # raw_features是把x直接过了pool、flattern和fc之后得到的
         raw_features = self.end_features(x)
@@ -320,5 +293,5 @@ class CifarResNet(nn.Module):
         return x
 
 
-def resnet_rebuffi(n=5, **kwargs):
-    return CifarResNet(n=n, **kwargs)
+def myresnet_gzy(n=5, **kwargs):
+    return MyResNetGZY([2,2,2,2], **kwargs)

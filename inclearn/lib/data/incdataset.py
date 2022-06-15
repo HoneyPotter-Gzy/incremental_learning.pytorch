@@ -280,8 +280,14 @@ class IncrementalDataset:
         elif dataset == "iscxvpn":
             # TODO: 定义MyDataLoader和MyDataset
             return DataLoader(
-                MyDataset(x, y, memory_flags)
+                MyDataset(x, y, memory_flags),
+                batch_size = self._batch_size,
+                shuffle = True
             )
+        # self.train_loader = DataLoader(train_dataset,
+        #                                        batch_size = self.batch_size,
+        #                                        shuffle = True,
+        #                                        pin_memory = True if self.device == "cuda" else False)
 
     def _setup_data(
         self,

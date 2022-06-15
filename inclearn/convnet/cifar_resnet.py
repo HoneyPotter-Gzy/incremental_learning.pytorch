@@ -11,7 +11,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn import init
 
-
+# 下采样（池化）模块A，把特征图缩小，步长是2，窗口大小是1，平均池化
 class DownsampleA(nn.Module):
     def __init__(self, nIn, nOut, stride):
         super(DownsampleA, self).__init__()
@@ -19,25 +19,27 @@ class DownsampleA(nn.Module):
         self.avg = nn.AvgPool2d(kernel_size=1, stride=stride)
 
     def forward(self, x):
+        # 对x做平均池化
         x = self.avg(x)
+        # 然后拼接，使得返回的特征图大小和原始输入保持一致？
         return torch.cat((x, x.mul(0)), 1)
 
 
 class ResNetBasicblock(nn.Module):
     expansion = 1
     """
-    RexNet basicblock (https://github.com/facebook/fb.resnet.torch/blob/master/models/resnet.lua)
+    ResNet basicblock (https://github.com/facebook/fb.resnet.torch/blob/master/models/resnet.lua)
     """
 
     def __init__(self, inplanes, planes, stride=1, downsample=None):
         super(ResNetBasicblock, self).__init__()
-
+        # 二维卷积+BN
         self.conv_a = nn.Conv2d(inplanes, planes, kernel_size=3, stride=stride, padding=1, bias=False)
         self.bn_a = nn.BatchNorm2d(planes)
-
+        # 再来一次二维卷积+BN
         self.conv_b = nn.Conv2d(planes, planes, kernel_size=3, stride=1, padding=1, bias=False)
         self.bn_b = nn.BatchNorm2d(planes)
-
+        # 下采样
         self.downsample = downsample
         self.featureSize = 64
 
@@ -53,7 +55,7 @@ class ResNetBasicblock(nn.Module):
 
         if self.downsample is not None:
             residual = self.downsample(x)
-
+        # 返回的是残差连接+本层输出得到的结果
         return F.relu(residual + basicblock, inplace=True)
 
 # CifarResNet定义基本的网络结构
