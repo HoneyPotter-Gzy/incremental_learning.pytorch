@@ -14,21 +14,22 @@ from base_model.model import MyResnet, get_MyResnet
 from typing import Type, Any, Callable, Union, List, Optional
 from torchvision.models.resnet import ResNet, BasicBlock, Bottleneck
 
-classNum = 8
+# classNum = 12
+
 class IncrementalResnet(MyResnet):
-    def __init__(
-        self,
+    def __init__(self,
         block: Type[Union[BasicBlock, Bottleneck]],
         layers: List[int],
-        num_classes: int = 1000,
+        num_classes: int,
         zero_init_residual: bool = False,
         groups: int = 1,
         width_per_group: int = 64,
         replace_stride_with_dilation: Optional[List[bool]] = None,
         norm_layer: Optional[Callable[..., nn.Module]] = None
     ):
-        super(IncrementalResnet, self).__init__(block, layers, num_classes, zero_init_residual, groups, width_per_group, replace_stride_with_dilation, norm_layer)
-        self.fc = nn.Linear(512, classNum)
+        MyResnet.__init__(self, block, layers, num_classes, zero_init_residual, groups, width_per_group, replace_stride_with_dilation, norm_layer)
+        self.classNum = num_classes
+        self.fc = nn.Linear(512, self.classNum)
 
     def increment_classes(self, n):
         '''
@@ -39,12 +40,14 @@ class IncrementalResnet(MyResnet):
         in_features = self.fc.in_features
         out_features = self.fc.out_features
         weight = self.fc.weight.data
+        bias = self.fc.bias.data
 
-        self.fc=nn.Linear(in_features, out_features+n, bias = False)
+        self.fc = nn.Linear(in_features, out_features+n)
         self.fc.weight.data[:out_features] = weight
+        self.fc.bias.data[:out_features] = bias
         self.classNum += n
 
 
-def get_MyIncrementalResnet() -> IncrementalResnet:
-    model = IncrementalResnet(BasicBlock, [2, 2, 2, 2])
+def get_MyIncrementalResnet(classNum: int) -> IncrementalResnet:
+    model = IncrementalResnet(BasicBlock, [2, 2, 2, 2], classNum)
     return model

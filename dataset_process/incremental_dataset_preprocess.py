@@ -22,7 +22,7 @@ def save_pickle (train_img, train_label, test_img, test_label, filename):
     test_label = np.array(test_label)
 
     # 转为one-hot
-    classNum=8
+    classNum=12
     train_label = np.eye(classNum)[train_label]
     test_label = np.eye(classNum)[test_label]
     with open(filename, 'wb') as f:
@@ -31,7 +31,8 @@ def save_pickle (train_img, train_label, test_img, test_label, filename):
         pickle.dump(test_img, f)
         pickle.dump(test_label, f)
 
-source_data = r'../dataset/12class-train-traffic-data.pkl'
+source_data = r'dataset/12class-train-traffic-data.pkl'
+classNum = 12
 
 # 通过修改这里的class来控制哪些类别是增量类别
 first_class = [0, 1, 2, 3, 4, 5, 6, 7]
