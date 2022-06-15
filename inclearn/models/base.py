@@ -42,10 +42,10 @@ class IncrementalLearner(abc.ABC):
         self.train()
         self._train_task(train_loader, val_loader)
 
-    def after_task_intensive(self, inc_dataset):
+    def after_task_intensive(self, inc_dataset, args):
         LOGGER.info("after task")
         self.eval()
-        self._after_task_intensive(inc_dataset)
+        self._after_task_intensive(inc_dataset, args)
 
     def after_task(self, inc_dataset):
         LOGGER.info("after task")

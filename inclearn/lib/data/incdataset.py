@@ -187,7 +187,7 @@ class IncrementalDataset:
         return x, y, memory_flags
 
     def get_custom_loader(
-        self, class_indexes, memory=None, mode="test", data_source="train", sampler=None
+        self, class_indexes, dataset, memory=None, mode="test", data_source="train", sampler=None
     ):
         """Returns a custom loader.
 
@@ -209,6 +209,7 @@ class IncrementalDataset:
             raise ValueError("Unknown data source <{}>.".format(data_source))
 
         data, targets = [], []
+        # 这一步是把待挑选类别的样本都拿出来，比如当前需要挑0~6类别的样本，就不管7~11类别的了
         for class_index in class_indexes:
             class_data, class_targets = self._select(
                 x, y, low_range=class_index, high_range=class_index + 1
@@ -233,7 +234,7 @@ class IncrementalDataset:
             memory_flags = np.zeros((data.shape[0],))
 
         return data, self._get_loader(
-            data, targets, memory_flags, shuffle=False, mode=mode, sampler=sampler
+            data, targets, memory_flags, shuffle=False, mode=mode, sampler=sampler, dataset = dataset
         )
 
     def get_memory_loader(self, data, targets):

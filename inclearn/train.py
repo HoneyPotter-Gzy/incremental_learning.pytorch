@@ -121,7 +121,7 @@ def _train(args, start_date, class_order, run_id):
         # 3. Conclude Task
         # ----------------
         model.eval()
-        _after_task(args, model, inc_dataset, run_id, task_id, results_folder)
+        _after_task(args, model, inc_dataset, run_id, task_id, results_folder, args = args)
 
         # ------------
         # 4. Eval Task
@@ -225,12 +225,12 @@ def _train_task(config, model, train_loader, val_loader, test_loader, run_id, ta
         model.train_task(train_loader, val_loader if val_loader else test_loader)
 
 
-def _after_task(config, model, inc_dataset, run_id, task_id, results_folder):
+def _after_task(config, model, inc_dataset, run_id, task_id, results_folder, args):
     if config["resume"] and os.path.isdir(config["resume"]) and not config["recompute_meta"] \
        and ((config["resume_first"] and task_id == 0) or not config["resume_first"]):
         model.load_metadata(config["resume"], run_id)
     else:
-        model.after_task_intensive(inc_dataset)
+        model.after_task_intensive(inc_dataset, args)
 
     model.after_task(inc_dataset)
 

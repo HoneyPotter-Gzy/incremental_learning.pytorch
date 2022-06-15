@@ -10,4 +10,4 @@ scheduling:
   - 63
 lr_decay: 0.2
 optimizer: sgd
-epochs: 70
+epochs: 1

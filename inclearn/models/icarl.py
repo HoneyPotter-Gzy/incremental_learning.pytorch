@@ -33,6 +33,7 @@ class ICarl(IncrementalLearner):
 
     def __init__(self, args):
         super().__init__()
+        self.dataset = args["dataset"]
 
         self._disable_progressbar = args.get("no_progressbar", False)
 
@@ -313,12 +314,12 @@ class ICarl(IncrementalLearner):
 
         return loss
 
-    def _after_task_intensive(self, inc_dataset):
+    def _after_task_intensive(self, inc_dataset, dataset):
         if self._herding_selection["type"] == "confusion":
             self._compute_confusion_matrix()
 
         self._data_memory, self._targets_memory, self._herding_indexes, self._class_means = self.build_examplars(
-            inc_dataset, self._herding_indexes
+            inc_dataset, self._herding_indexes, self.dataset
         )
 
     def _after_task(self, inc_dataset):
@@ -387,9 +388,9 @@ class ICarl(IncrementalLearner):
     # -----------------
     # Memory management
     # -----------------
-
+    # TODO: 这里exemplars的选择和处理
     def build_examplars(
-        self, inc_dataset, herding_indexes, memory_per_class=None, data_source="train"
+        self, inc_dataset, herding_indexes, dataset, memory_per_class=None, data_source="train"
     ):
         logger.info("Building & updating memory.")
         memory_per_class = memory_per_class or self._memory_per_class
@@ -401,12 +402,14 @@ class ICarl(IncrementalLearner):
         for class_idx in range(self._n_classes):
             # We extract the features, both normal and flipped:
             inputs, loader = inc_dataset.get_custom_loader(
-                class_idx, mode="test", data_source=data_source
+                class_idx, self.dataset, mode="test", data_source=data_source
             )
+            # 提取features
             features, targets = utils.extract_features(self._network, loader)
+            # TODO: 现在打开了flip模式，看看后续要不要关掉
             features_flipped, _ = utils.extract_features(
                 self._network,
-                inc_dataset.get_custom_loader(class_idx, mode="flip", data_source=data_source)[1]
+                inc_dataset.get_custom_loader(class_idx, self.dataset, mode="flip", data_source=data_source)[1]
             )
 
             if class_idx >= self._n_classes - self._task_size:
