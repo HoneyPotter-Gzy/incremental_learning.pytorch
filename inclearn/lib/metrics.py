@@ -7,12 +7,13 @@ import torch
 class MetricLogger:
 
     def __init__(self, nb_tasks, nb_classes, increments):
+        # metrics:一个高级的字典
         self.metrics = collections.defaultdict(list)
 
-        self.nb_tasks = nb_tasks
-        self.nb_classes = nb_classes
-        self.increments = increments
-
+        self.nb_tasks = nb_tasks  # number_tasks
+        self.nb_classes = nb_classes  # number_classes
+        self.increments = increments  # 增加的类别
+        # 正确率矩阵，类别数*任务数
         self._accuracy_matrix = np.ones((nb_classes, nb_tasks), dtype="float16") * -1
         self._task_counter = 0
 
@@ -115,14 +116,14 @@ def cord_metric(accuracy_matrix, only=None):
 
 def accuracy_per_task(ypreds, ytrue, task_size=10, topk=1):
     """Computes accuracy for the whole test & per task.
-
+    # 计算每个任务的正确率
     :param ypred: The predictions array.
     :param ytrue: The ground-truth array.
     :param task_size: The size of the task.
-    :return: A dictionnary.
+    :return: A dictionary.
     """
     all_acc = {}
-
+    # 计算所有任务的准确率
     all_acc["total"] = accuracy(ypreds, ytrue, topk=topk)
 
     if task_size is not None:
@@ -175,7 +176,7 @@ def accuracy(output, targets, topk=1):
     if batch_size == 0:
         return 0.
     nb_classes = len(np.unique(targets))
-    topk = min(topk, nb_classes)
+    topk = min(topk, nb_classes)  # 取topk和总类别数的最小值作为实际的topk
 
     _, pred = output.topk(topk, 1, True, True)
     pred = pred.t()

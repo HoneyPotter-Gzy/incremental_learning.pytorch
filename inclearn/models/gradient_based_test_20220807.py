@@ -1,3 +1,12 @@
+#!/usr/bin/env python
+# -*- encoding: utf-8 -*-
+'''
+@Time: 2022/8/7 17:02  
+@Author: Zheyuan Gu
+@File: gradient_based_test_20220807.py   
+@Description: None
+'''
+
 import collections
 import copy
 import logging
@@ -20,16 +29,7 @@ EPSILON = 1e-8
 logger = logging.getLogger(__name__)
 
 # 每个方法是一个类，这个类继承IncrementalLearner
-class ICarl(IncrementalLearner):
-    """Implementation of iCarl.
-
-    # References:
-    - iCaRL: Incremental Classifier and Representation Learning
-      Sylvestre-Alvise Rebuffi, Alexander Kolesnikov, Georg Sperl, Christoph H. Lampert
-      https://arxiv.org/abs/1611.07725
-
-    :param args: An argparse parsed arguments object.
-    """
+class GradientBasedSelection(IncrementalLearner):
 
     def __init__(self, args):
         super().__init__()
@@ -388,6 +388,7 @@ class ICarl(IncrementalLearner):
     # -----------------
     # Memory management
     # -----------------
+    # 每个Minibatch之后执行examplars的选择
     def build_examplars(
         self, inc_dataset, herding_indexes, dataset, memory_per_class=None, data_source="train"
     ):
