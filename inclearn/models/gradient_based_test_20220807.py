@@ -24,6 +24,8 @@ from inclearn.lib import factory, herding, losses, network, schedulers, utils
 from inclearn.lib.network import hook
 from inclearn.models.base import IncrementalLearner
 
+from inclearn.lib.gradient_herding import HerdingSelection  # 样本选择类
+
 EPSILON = 1e-8
 
 logger = logging.getLogger(__name__)
@@ -57,14 +59,14 @@ class GradientBasedSelection(IncrementalLearner):
 
         self._memory_size = args["memory_size"]
         self._fixed_memory = args["fixed_memory"]
-        self._herding_selection = args.get("herding_selection", {"type": "icarl"})
+        self._herding_selection = args.get("herding_selection", {"type": "gradient"})
         self._n_classes = 0
         self._last_results = None
         self._validation_percent = args["validation"]
 
         self._rotations_config = args.get("rotations_config", {})
         self._random_noise_config = args.get("random_noise_config", {})
-        # 网络基本结构的定义由args["convnet"]决定，通过BasicNet类来初始化
+
         self._network = network.BasicNet(
             args["convnet"],
             convnet_kwargs=args.get("convnet_config", {}),
@@ -92,65 +94,71 @@ class GradientBasedSelection(IncrementalLearner):
 
         self._meta_transfer = args.get("meta_transfer", {})
 
-    def set_meta_transfer(self):
-        if self._meta_transfer["type"] not in ("repeat", "once", "none"):
-            raise ValueError(f"Invalid value for meta-transfer {self._meta_transfer}.")
+        self._inner_class_score = dict()
+        self._inner_task_score = dict()
+        self._cross_task_score = dict()
+        self._total_score = dict()
 
-        if self._task == 0:
-            self._network.convnet.apply_mtl(False)
-        elif self._task == 1:
-            if self._meta_transfer["type"] != "none":
-                self._network.convnet.apply_mtl(True)
-
-            if self._meta_transfer.get("mtl_bias"):
-                self._network.convnet.apply_mtl_bias(True)
-            elif self._meta_transfer.get("bias_on_weight"):
-                self._network.convnet.apply_bias_on_weights(True)
-
-            if self._meta_transfer["freeze_convnet"]:
-                self._network.convnet.freeze_convnet(
-                    True,
-                    bn_weights=self._meta_transfer.get("freeze_bn_weights"),
-                    bn_stats=self._meta_transfer.get("freeze_bn_stats")
-                )
-        elif self._meta_transfer["type"] != "none":
-            if self._meta_transfer["type"] == "repeat" or (
-                self._task == 2 and self._meta_transfer["type"] == "once"
-            ):
-                self._network.convnet.fuse_mtl_weights()
-                self._network.convnet.reset_mtl_parameters()
-
-                if self._meta_transfer["freeze_convnet"]:
-                    self._network.convnet.freeze_convnet(
-                        True,
-                        bn_weights=self._meta_transfer.get("freeze_bn_weights"),
-                        bn_stats=self._meta_transfer.get("freeze_bn_stats")
-                    )
-
-    def save_metadata(self, directory, run_id):
-        path = os.path.join(directory, f"meta_{run_id}_task_{self._task}.pkl")
-
-        logger.info("Saving metadata at {}.".format(path))
-        with open(path, "wb+") as f:
-            pickle.dump(
-                [self._data_memory, self._targets_memory, self._herding_indexes, self._class_means],
-                f
-            )
-
-    def load_metadata(self, directory, run_id):
-        path = os.path.join(directory, f"meta_{run_id}_task_{self._task}.pkl")
-        if not os.path.exists(path):
-            return
-
-        logger.info("Loading metadata at {}.".format(path))
-        with open(path, "rb") as f:
-            self._data_memory, self._targets_memory, self._herding_indexes, self._class_means = pickle.load(
-                f
-            )
-
-    @property
-    def epoch_metrics(self):
-        return dict(self._epoch_metrics)
+    # # 元迁移（小样本中的一个方法）
+    # def set_meta_transfer(self):
+    #     if self._meta_transfer["type"] not in ("repeat", "once", "none"):
+    #         raise ValueError(f"Invalid value for meta-transfer {self._meta_transfer}.")
+    #
+    #     if self._task == 0:
+    #         self._network.convnet.apply_mtl(False)
+    #     elif self._task == 1:
+    #         if self._meta_transfer["type"] != "none":
+    #             self._network.convnet.apply_mtl(True)
+    #
+    #         if self._meta_transfer.get("mtl_bias"):
+    #             self._network.convnet.apply_mtl_bias(True)
+    #         elif self._meta_transfer.get("bias_on_weight"):
+    #             self._network.convnet.apply_bias_on_weights(True)
+    #
+    #         if self._meta_transfer["freeze_convnet"]:
+    #             self._network.convnet.freeze_convnet(
+    #                 True,
+    #                 bn_weights=self._meta_transfer.get("freeze_bn_weights"),
+    #                 bn_stats=self._meta_transfer.get("freeze_bn_stats")
+    #             )
+    #     elif self._meta_transfer["type"] != "none":
+    #         if self._meta_transfer["type"] == "repeat" or (
+    #             self._task == 2 and self._meta_transfer["type"] == "once"
+    #         ):
+    #             self._network.convnet.fuse_mtl_weights()
+    #             self._network.convnet.reset_mtl_parameters()
+    #
+    #             if self._meta_transfer["freeze_convnet"]:
+    #                 self._network.convnet.freeze_convnet(
+    #                     True,
+    #                     bn_weights=self._meta_transfer.get("freeze_bn_weights"),
+    #                     bn_stats=self._meta_transfer.get("freeze_bn_stats")
+    #                 )
+    #
+    # def save_metadata(self, directory, run_id):
+    #     path = os.path.join(directory, f"meta_{run_id}_task_{self._task}.pkl")
+    #
+    #     logger.info("Saving metadata at {}.".format(path))
+    #     with open(path, "wb+") as f:
+    #         pickle.dump(
+    #             [self._data_memory, self._targets_memory, self._herding_indexes, self._class_means],
+    #             f
+    #         )
+    #
+    # def load_metadata(self, directory, run_id):
+    #     path = os.path.join(directory, f"meta_{run_id}_task_{self._task}.pkl")
+    #     if not os.path.exists(path):
+    #         return
+    #
+    #     logger.info("Loading metadata at {}.".format(path))
+    #     with open(path, "rb") as f:
+    #         self._data_memory, self._targets_memory, self._herding_indexes, self._class_means = pickle.load(
+    #             f
+    #         )
+    #
+    # @property
+    # def epoch_metrics(self):
+    #     return dict(self._epoch_metrics)
 
     # ----------
     # Public API
@@ -169,18 +177,18 @@ class GradientBasedSelection(IncrementalLearner):
             self._optimizer, self._scheduling, gamma=self._lr_decay
         )
 
-        if self._warmup_config:
-            if self._warmup_config.get("only_first_step", True) and self._task != 0:
-                pass
-            else:
-                logger.info("Using WarmUp")
-                self._scheduler = schedulers.GradualWarmupScheduler(
-                    optimizer=self._optimizer,
-                    after_scheduler=base_scheduler,
-                    **self._warmup_config
-                )
-        else:
-            self._scheduler = base_scheduler
+        # if self._warmup_config:
+        #     if self._warmup_config.get("only_first_step", True) and self._task != 0:
+        #         pass
+        #     else:
+        #         logger.info("Using WarmUp")
+        #         self._scheduler = schedulers.GradualWarmupScheduler(
+        #             optimizer=self._optimizer,
+        #             after_scheduler=base_scheduler,
+        #             **self._warmup_config
+        #         )
+        # else:
+        #     self._scheduler = base_scheduler
 
     def _train_task(self, train_loader, val_loader):
         logger.debug("nb {}.".format(len(train_loader.dataset)))
@@ -191,7 +199,6 @@ class GradientBasedSelection(IncrementalLearner):
     ):
         best_epoch, best_acc = -1, -1.
         wait = 0
-
         grad, act = None, None
         if len(self._multiple_devices) > 1:
             logger.info("Duplicating model on {} gpus.".format(len(self._multiple_devices)))
@@ -202,6 +209,10 @@ class GradientBasedSelection(IncrementalLearner):
                 training_network.module.convnet.last_conv.register_forward_hook(for_hook)
         else:
             training_network = self._network
+            grad, act, back_hook, for_hook = hook.get_gradcam_hook(
+                training_network)  # grad: hook勾到的梯度
+            # training_network.convnet.final_layer.register_backward_hook(back_hook)
+            training_network.convnet.stage_4.register_backward_hook(back_hook)
 
         for epoch in range(initial_epoch, nb_epochs):
             self._metrics = collections.defaultdict(float)
@@ -220,7 +231,7 @@ class GradientBasedSelection(IncrementalLearner):
                 ascii=True,
                 bar_format="{desc}: {percentage:3.0f}% | {n_fmt}/{total_fmt} | {rate_fmt}{postfix}"
             )
-            for i, input_dict in enumerate(prog_bar, start=1):
+            for i, input_dict in enumerate(prog_bar, start=1):  # minibatch
                 inputs, targets = input_dict["inputs"], input_dict["targets"]
                 memory_flags = input_dict["memory_flags"]
 
@@ -229,7 +240,7 @@ class GradientBasedSelection(IncrementalLearner):
                     _clean_list(act)
 
                 self._optimizer.zero_grad()
-                loss = self._forward_loss(
+                loss, outputs = self._forward_loss(
                     training_network,
                     inputs,
                     targets,
@@ -237,16 +248,28 @@ class GradientBasedSelection(IncrementalLearner):
                     gradcam_grad=grad,
                     gradcam_act=act
                 )
-                loss.backward()
-                self._optimizer.step()
+                loss.backward()  # 反传，可以在这里把梯度拿出来
+                # TODO: inner-task score calcuation
+                self._inner_task_score_calculation(grad)
+
+                # TODO: cross-task score calculation
+                # tmp_network = copy.deepcopy(self._network)
+                # tmp_network.train()
+
+
+                # batch_grad = inputs.grad
+                self._optimizer.step()  # 更新模型参数
 
                 if clipper:
                     training_network.apply(clipper)
 
                 self._print_metrics(prog_bar, epoch, nb_epochs, i)
+                # 如果是基于梯度的方法，则需要在一个minibatch挑选
+                if self._herding_selection["type"] == "gradient":
+                    pass
 
             if self._scheduler:
-                self._scheduler.step(epoch)
+                self._scheduler.step(epoch)  # 调整学习率
 
             if self._eval_every_x_epochs and epoch != 0 and epoch % self._eval_every_x_epochs == 0:
                 self._network.eval()
@@ -268,6 +291,8 @@ class GradientBasedSelection(IncrementalLearner):
                 if self._early_stopping and self._early_stopping["patience"] > wait:
                     logger.warning("Early stopping!")
                     break
+        # TODO: inner-class score calcuation
+        self._herding.inner_class_score_calculation()
 
         if self._eval_every_x_epochs:
             logger.info("Best accuracy reached at epoch {} with {}%.".format(best_epoch, best_acc))
@@ -312,7 +337,7 @@ class GradientBasedSelection(IncrementalLearner):
 
         self._metrics["loss"] += loss.item()
 
-        return loss
+        return loss, outputs
 
     def _after_task_intensive(self, inc_dataset, dataset):
         if self._herding_selection["type"] == "confusion":
@@ -378,6 +403,40 @@ class GradientBasedSelection(IncrementalLearner):
 
         return loss
 
+    def _inner_class_score_calculation(self, class_representation, label):
+        pass
+
+    def _inner_task_score_calculation (self, curr_task_grad):
+        task_grads = curr_task_grad[0]
+        x_grads = task_grads[1]
+        mean_grad = torch.mean(x_grads, dim = 0)
+
+        for i in range(len(x_grads)):
+            x_grad = x_grads[i]
+            self._inner_task_score[i] = F.cosine_similarity(x_grad, mean_grad,
+                                                           dim = 0)
+
+        self._inner_task_score = sorted(self.inner_task_score.items(),
+                                       key = lambda x: x[1].item(),
+                                       reverse = True)
+
+    def _cross_task_score_calculation(self, curr_task_grad, old_task_grad):
+        cross_task_score = dict()
+
+        task_grads = curr_task_grad[0]
+        x_grads = task_grads[1]
+
+        old_grads = old_task_grad[0]
+        old_x_grads = old_grads[1]
+        mean_old_grad = torch.mean(old_x_grads, dim = 0)
+
+        for i in range(len(x_grads)):
+            x_grad = x_grads[i]
+            cross_task_score[i] = F.cosine_similarity(x_grad, mean_old_grad,
+                                                      dim = 0)
+        cross_task_score = sorted(cross_task_score.items(),
+                                  key = lambda x: x[1].item(), reverse = True)
+
     @property
     def _memory_per_class(self):
         """Returns the number of examplars per class."""
@@ -388,7 +447,6 @@ class GradientBasedSelection(IncrementalLearner):
     # -----------------
     # Memory management
     # -----------------
-    # 每个Minibatch之后执行examplars的选择
     def build_examplars(
         self, inc_dataset, herding_indexes, dataset, memory_per_class=None, data_source="train"
     ):
@@ -406,7 +464,6 @@ class GradientBasedSelection(IncrementalLearner):
             )
             # 提取features
             features, targets = utils.extract_features(self._network, loader)
-            # TODO: 现在打开了flip模式，看看后续要不要关掉
             features_flipped, _ = utils.extract_features(
                 self._network,
                 inc_dataset.get_custom_loader(class_idx, self.dataset, mode="flip", data_source=data_source)[1]
@@ -414,7 +471,6 @@ class GradientBasedSelection(IncrementalLearner):
 
             if class_idx >= self._n_classes - self._task_size:
                 # New class, selecting the examplars:
-                # TODO: 样本选择方式的具体实现在herding中
                 if self._herding_selection["type"] == "icarl":
                     selected_indexes = herding.icarl_selection(features, memory_per_class)
                 elif self._herding_selection["type"] == "closest":
@@ -442,6 +498,10 @@ class GradientBasedSelection(IncrementalLearner):
                     selected_indexes = herding.mcbn(
                         memory_per_class, self._network, loader, **self._herding_selection
                     )
+                # elif self._herding_selection["type"] == "gradient_based":  # to be implemented
+                #     selected_indexes = herding.gradient_based(
+                #         memory_per_class, self._network, loader, **self._herding_selection
+                #     )
                 else:
                     raise ValueError(
                         "Unknown herding selection {}.".format(self._herding_selection)
@@ -471,6 +531,11 @@ class GradientBasedSelection(IncrementalLearner):
         targets_memory = np.concatenate(targets_memory)
 
         return data_memory, targets_memory, herding_indexes, class_means
+
+
+    def build_examplars_per_batch(self):
+        index_max = herding.cosine_similarity()
+
 
     def get_memory(self):
         return self._data_memory, self._targets_memory

@@ -44,7 +44,7 @@ def train(args):
     start_date = utils.get_date()
 
     orders = copy.deepcopy(args["order"])
-    # 删除args中的order，为啥要删除？
+
     del args["order"]
     if orders is not None:
         assert isinstance(orders, list) and len(orders)

@@ -53,11 +53,10 @@ def get_convnet(convnet_type, **kwargs):
         return my_resnet_mtl.resnet_rebuffi(**kwargs)
     elif convnet_type == "vgg19":
         return vgg.vgg19_bn(**kwargs)
-    # TODO: 完善基模型
     elif convnet_type == "myresnet_gzy":
         return my_resnet_gzy.myresnet_gzy(**kwargs)
 
-    raise NotImplementedError("Unknwon convnet type {}.".format(convnet_type))
+    raise NotImplementedError("Unknown convnet type {}.".format(convnet_type))
 
 
 def get_model(args):
@@ -72,7 +71,8 @@ def get_model(args):
         "podnet": models.PODNet,
         "lwm": models.LwM,
         "zil": models.ZIL,
-        "gdumb": models.GDumb
+        "gdumb": models.GDumb,
+        "gradient": models.GradientBasedSelection
     }
 
     model = args["model"].lower()

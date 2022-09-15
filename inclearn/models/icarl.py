@@ -52,7 +52,7 @@ class ICarl(IncrementalLearner):
         if self._warmup_config and self._warmup_config["total_epoch"] > 0:
             self._lr /= self._warmup_config["multiplier"]
 
-        self._eval_every_x_epochs = args.get("eval_every_x_epochs")
+        self._eval_every_x_epochs = args.get("eval_every_x_epochs")  # 每x个epoch进行一次样本选择
         self._early_stopping = args.get("early_stopping", {})
 
         self._memory_size = args["memory_size"]
@@ -237,7 +237,7 @@ class ICarl(IncrementalLearner):
                     gradcam_grad=grad,
                     gradcam_act=act
                 )
-                loss.backward()
+                loss.backward()  # backward_hook
                 self._optimizer.step()
 
                 if clipper:
@@ -413,7 +413,6 @@ class ICarl(IncrementalLearner):
 
             if class_idx >= self._n_classes - self._task_size:
                 # New class, selecting the examplars:
-                # TODO: 样本选择方式的具体实现在herding中
                 if self._herding_selection["type"] == "icarl":
                     selected_indexes = herding.icarl_selection(features, memory_per_class)
                 elif self._herding_selection["type"] == "closest":
@@ -423,8 +422,11 @@ class ICarl(IncrementalLearner):
                 elif self._herding_selection["type"] == "first":
                     selected_indexes = np.arange(memory_per_class)
                 elif self._herding_selection["type"] == "kmeans":
+                    # selected_indexes = herding.kmeans(
+                    #     features, memory_per_class, k=self._herding_selection["k"]
+                    # )
                     selected_indexes = herding.kmeans(
-                        features, memory_per_class, k=self._herding_selection["k"]
+                        features, memory_per_class, k=10
                     )
                 elif self._herding_selection["type"] == "confusion":
                     selected_indexes = herding.confusion(
@@ -441,6 +443,9 @@ class ICarl(IncrementalLearner):
                     selected_indexes = herding.mcbn(
                         memory_per_class, self._network, loader, **self._herding_selection
                     )
+                # TODO: triple
+                elif self._herding_selection["type"] == "triple":
+                    selected_indexes = herding.triple()
                 else:
                     raise ValueError(
                         "Unknown herding selection {}.".format(self._herding_selection)

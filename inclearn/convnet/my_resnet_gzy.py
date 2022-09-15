@@ -18,6 +18,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn import init
 from typing import Type, Any, Callable, Union, List, Optional
+from inclearn.models.base import IncrementalLearner
 
 from inclearn.lib import pooling
 
@@ -145,7 +146,7 @@ class MyResNetGZY(nn.Module):
         zero_residual=True,
         pooling_config={"type": "avg"},  # 默认平均池化
         downsampling="stride",  # 下采样：步长
-        final_layer=False,
+        final_layer= None,
         all_attentions=False,
         last_relu=False,
         **kwargs
@@ -173,16 +174,8 @@ class MyResNetGZY(nn.Module):
         # self.conv_1_3x3 = nn.Conv2d(channels, nf, kernel_size=3, stride=1, padding=1, bias=False)
         self.conv1 = nn.Conv2d(channels, nf, kernel_size = (7, 7), stride = (1, 1), padding = 3, bias = False)
         # nf: num_features, 特征个数，函数默认参数是64
-        # TODO: 这里要过BN吗
         self.bn_1 = nn.BatchNorm2d(nf)
-        # 四个layer，以下的block都是残差块
-        # increase_dim是指，n是指Block的个数
-        # TODO: 明天起来改写_make_layer
-        # 接口make_layer要返回stage类型
-        # self.stage_1 = self._make_layer(Block, nf, increase_dim=False, n=n)
-        # self.stage_2 = self._make_layer(Block, nf, increase_dim=True, n=n - 1)
-        # self.stage_3 = self._make_layer(Block, 2 * nf, increase_dim=True, n=n - 2)
-        # 和原模型的区别在于：第二层nf不翻倍，最后一层只用一个Block
+
         self.stage_1 = self._make_layer(Block, nf, increase_dim = False, n = layers[0])
         self.stage_2 = self._make_layer(Block, nf, increase_dim = True, n = layers[1])
         self.stage_3 = self._make_layer(Block, 2*nf, increase_dim = True, n = layers[2])
@@ -198,10 +191,10 @@ class MyResNetGZY(nn.Module):
             raise ValueError("Unknown pooling type {}.".format(pooling_config["type"]))
         # 输出维度
         self.out_dim = 4 * nf
-        # 如果最后一层要再卷一下
+        # 如果最后一层要再过一下卷积
         if final_layer in (True, "conv"):
             self.final_layer = nn.Conv2d(self.out_dim, self.out_dim, kernel_size=1, bias=False)
-        # 如果有最后一层，那么在特征提取后加上BN和线性分类层
+        # 如果有最后一层，要在特征提取后加上BN和线性分类层
         elif isinstance(final_layer, dict):
             if final_layer["type"] == "one_layer":
                 self.final_layer = nn.Sequential(
@@ -221,26 +214,15 @@ class MyResNetGZY(nn.Module):
                 raise ValueError("Unknown final layer type {}.".format(final_layer["type"]))
         else:
             self.final_layer = None
-        # 参数初始化的方式
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-            elif isinstance(m, nn.BatchNorm2d):
-                nn.init.constant_(m.weight, 1)
-                nn.init.constant_(m.bias, 0)
-            elif isinstance(m, nn.Linear):
-                nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
 
-        if zero_residual:
-            for m in self.modules():
-                if isinstance(m, ResidualBlock):
-                    nn.init.constant_(m.bn_b.weight, 0)
-    #    self._make_layer(Block, nf, increase_dim=False, n=n)
-    # Block是残差块，ResidualBlock()
-    # ResidualBlock()的构造函数：def __init__(self, inplanes, increase_dim=False, last_relu=False, downsampling="stride"):
+        nn.init.kaiming_normal(self.conv1.weight, mode = "fan_out",
+                               nonlinearity = "relu")
+        nn.init.constant_(self.bn_1.weight, 1)
+        nn.init.constant_(self.bn_1.bias, 0)
+
     def _make_layer(self, Block, planes, increase_dim=False, n=None):
         layers = []
-        # 如果要增加维度的话，就构造一个增加维度的ResidualBlock，每构造一层，planes都翻一倍
+
         if increase_dim:
             layers.append(
                 Block(

@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class BasicNet(nn.Module):
-    # BasicNet初始化部分，
+    # 模型参数的初始化
     def __init__(
         self,
         convnet_type,
@@ -64,16 +64,16 @@ class BasicNet(nn.Module):
         else:
             raise ValueError("Unknown classifier type {}.".format(classifier_kwargs["type"]))
 
-        if rotations_predictor:
-            print("Using a rotations predictor.")
-            self.rotations_predictor = nn.Linear(self.convnet.out_dim, 4)
-        else:
-            self.rotations_predictor = None
-
-        if wordembeddings_kwargs:
-            self.word_embeddings = Word2vec(**wordembeddings_kwargs, device=device)
-        else:
-            self.word_embeddings = None
+        # if rotations_predictor:
+        #     print("Using a rotations predictor.")
+        #     self.rotations_predictor = nn.Linear(self.convnet.out_dim, 4)
+        # else:
+        #     self.rotations_predictor = None
+        #
+        # if wordembeddings_kwargs:
+        #     self.word_embeddings = Word2vec(**wordembeddings_kwargs, device=device)
+        # else:
+        #     self.word_embeddings = None
 
         self.return_features = return_features
         self.extract_no_act = extract_no_act
@@ -83,6 +83,8 @@ class BasicNet(nn.Module):
         self.device = device
 
         self.domain_classifier = None
+
+        self._hooks = [None, None]  # 储存钩子
 
         if self.gradcam_hook:
             self._hooks = [None, None]
@@ -118,8 +120,8 @@ class BasicNet(nn.Module):
             words = None
 
         outputs = self.convnet(x)
-        if words is not None:  # ugly to change
-            outputs["word_embeddings"] = self.word_embeddings(words)
+        # if words is not None:  # ugly to change
+        #     outputs["word_embeddings"] = self.word_embeddings(words)
 
         if hasattr(self, "classifier_no_act") and self.classifier_no_act:
             selected_features = outputs["raw_features"]
@@ -254,7 +256,7 @@ class BasicNet(nn.Module):
         def forward_hook(module, input, output):
             self._gradcam_activations[0] = output
             return None
-
+        # register_backward_hook: Module反向传播中的hook,每次计算module的梯度后，自动调用hook函数。
         self._hooks[0] = self.convnet.last_conv.register_backward_hook(backward_hook)
         self._hooks[1] = self.convnet.last_conv.register_forward_hook(forward_hook)
 

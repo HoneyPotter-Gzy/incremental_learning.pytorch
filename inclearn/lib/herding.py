@@ -172,60 +172,80 @@ def mcbn(memory_per_class, network, loader, select="max", nb_samples=100, type=N
         return indexes[:memory_per_class]
     raise ValueError("Only possible value for <select> are [max, min], not {}.".format(select))
 
-
-def grad_based_selection_origin(features, grad, nb_exemplars):
-    # 基于梯度的样本选择
-    # 基于梯度的样本选择，每个minibatch选择一次
-    # 考虑两个部分：新知识的代表性和旧知识的损害
-    # 新知识的代表性：可以有四种实现：样本原始特征均值、产生的梯度更新均值、输出的高维特征空间均值、另接一个特征映射器产生的均值
-    # 旧知识的损害：对于旧模型的梯度更新损害
-    # 先实现第一种
-    # params: samples: minibatch的所有样本
-    #         grad: 模型此次更新的梯度
-    #         nb_exemplars: 要选择的样本个数
-    D = features.T  # 转置
-    D = D / (np.linalg.norm(D, axis = 0) + 1e-8)  # 归一化，压缩行，对各列求均值，返回1*n，前面已经转置了
-    mu = np.mean(D, axis = 1)  # 计算每一行的均值，这里返回一个实数（就是正文中的μ
-
-    herding_matrix = np.zeros((features.shape[0],))  # 初始化一个和features行数一样的n*1向量
-
-    w_t = mu  # 实数，
-    iter_herding, iter_herding_eff = 0, 0  # eff？是什么
-
-    while not (  # 开始筛选
-            # herding_matrix中非0的元素个数==应当挑选的样本数，意思就是还没挑完
-            np.sum(herding_matrix != 0) == min(nb_exemplars, samples.shape[0])
-    ) and iter_herding_eff < 1000:
-        tmp_t = np.dot(w_t, D)  # w_t和D相乘
-        ind_max = np.argmax(tmp_t)  # 找到tmp_t中最大元素对应的下标，会对高维数组降为至1维，返回压缩后的下标
-        iter_herding_eff += 1  # eff+=1
-        if herding_matrix[ind_max] == 0:  # 如果ind_max是0
-            herding_matrix[ind_max] = 1 + iter_herding  # 在第iter轮添加的
-            iter_herding += 1
-
-        w_t = w_t + mu - D[:, ind_max]
-
-    herding_matrix[np.where(herding_matrix == 0)[0]] = 10000
-
-    return herding_matrix.argsort()[:nb_exemplars]
+def triple():
+    pass
 
 
-def cosine_similarity_cal(exam_grad, mean_grad):
-    # 计算当前样本梯度和minibatch平均梯度之间的相似度，返回相似度评分
-    # exam_grad的维度：一维？
-    # D = D / (np.linalg.norm(D, axis = 0) + 1e-8)
-    exam_grad = exam_grad / (np.linalg.norm(exam_grad, )+1e-8)
 
+# def grad_based_selection_origin(features, grad, nb_exemplars):
+#     # 基于梯度的样本选择
+#     # 基于梯度的样本选择，每个minibatch选择一次
+#     # 考虑两个部分：新知识的代表性和旧知识的损害
+#     # 新知识的代表性：可以有四种实现：样本原始特征均值、产生的梯度更新均值、输出的高维特征空间均值、另接一个特征映射器产生的均值
+#     # 旧知识的损害：对于旧模型的梯度更新损害
+#     # 先实现第一种
+#     # params: samples: minibatch的所有样本
+#     #         grad: 模型此次更新的梯度
+#     #         nb_exemplars: 要选择的样本个数
+#     D = features.T  # 转置
+#     D = D / (np.linalg.norm(D, axis = 0) + 1e-8)  # 归一化，压缩行，对各列求均值，返回1*n，前面已经转置了
+#     mu = np.mean(D, axis = 1)  # 计算每一行的均值，这里返回一个实数（就是正文中的μ
+#
+#     herding_matrix = np.zeros((features.shape[0],))  # 初始化一个和features行数一样的n*1向量
+#
+#     w_t = mu  # 实数，
+#     iter_herding, iter_herding_eff = 0, 0  # eff？是什么
+#
+#     while not (  # 开始筛选
+#             # herding_matrix中非0的元素个数==应当挑选的样本数，意思就是还没挑完
+#             np.sum(herding_matrix != 0) == min(nb_exemplars, samples.shape[0])
+#     ) and iter_herding_eff < 1000:
+#         tmp_t = np.dot(w_t, D)  # w_t和D相乘
+#         ind_max = np.argmax(tmp_t)  # 找到tmp_t中最大元素对应的下标，会对高维数组降为至1维，返回压缩后的下标
+#         iter_herding_eff += 1  # eff+=1
+#         if herding_matrix[ind_max] == 0:  # 如果ind_max是0
+#             herding_matrix[ind_max] = 1 + iter_herding  # 在第iter轮添加的
+#             iter_herding += 1
+#
+#         w_t = w_t + mu - D[:, ind_max]
+#
+#     herding_matrix[np.where(herding_matrix == 0)[0]] = 10000
+#
+#     return herding_matrix.argsort()[:nb_exemplars]
 #
 #
+# def gradient_based(exam_grad, exemplars_grad, nb_exemplars):
+#     """
+#     基于梯度更新的样本选择方法。
+#     @param exam_grad:  样本梯度
+#     @param exemplars_grad: 历史样本梯度
+#     @param nb_exemplars:  需要选择的样本个数
+#     """
+#     # herding_index = np.zeros((exam_grad.shape[0],))
 #
-# def grad_based_selection_grad():
+#     # 计算样本梯度均值
+#     exam_grad_T = exam_grad.T
+#     exam_grad_T = exam_grad_T / (np.linalg.norm(exam_grad_T, axis = 0) + 1e-8)
+#     exam_mean_grad = np.mean(exam_grad_T, axis = 1)
 #
+#     # 计算历史样本梯度均值
+#     exemplars_grad_T = exemplars_grad.T
+#     exemplars_grad_T = exemplars_grad_T / (np.linalg.norm(exemplars_grad_T,
+#                                                           axis = 0) + 1e-8)
+#     exemplars_mean_grad = np.mean(exemplars_grad_T, axis = 1)
 #
-# def grad_based_selection_features():
+#     score = cosine_similarity(exam_grad, exam_mean_grad) + \
+#             cosine_similarity(exam_grad, exemplars_mean_grad)
 #
-#
-# def grad_based_selection_other_features():
+#     # 选出top K个样本
+#     index_max = np.argpartition(score,
+#                                 nb_exemplars,
+#                                 axis= 0)[-nb_exemplars, len(score)]
+#     # herding_index[index_max] = 1
+#     # 对应的样本
+#     # herding_exemplars = [index_max]
+#     # return herding_exemplars
+#     return index_max
 
 
 # ---------
